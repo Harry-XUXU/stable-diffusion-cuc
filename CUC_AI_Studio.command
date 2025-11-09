@@ -512,6 +512,7 @@ monitor_macos_startup() {
     echo -e "${CYAN}🚀 启动监控中...${NC}"
     echo -e "${BLUE}────────────────────────────────────────────${NC}"
     echo -e "${YELLOW}💡 提示: CUDA警告在macOS上是正常现象${NC}"
+    echo -e "${YELLOW}💡 提示: 初次下载运行需要下载模型文件，请等待..${NC}"
     echo ""
     
     # 设置超时（2小时）
