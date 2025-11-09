@@ -1,0 +1,2 @@
+formal_dress,2girls,
+Steps: 20, Sampler: DPM++ 2M, Schedule type: Automatic, CFG scale: 7, Seed: 1651456225, Size: 512x512, Model hash: 6ce0161689, Model: v1-5-pruned-emaonly, Version: v1.10.1
