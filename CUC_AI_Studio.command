@@ -132,6 +132,7 @@ COMPATIBLE_PACKAGES=(
 "python-dateutil==2.9.0.post0"
 "python-multipart==0.0.20"
 "pytorch-lightning==1.9.5"
+"pytorch_lightning==1.9.5"
 "pytz==2025.2"
 "PyWavelets==1.8.0"
 "PyYAML==6.0.3"
@@ -461,13 +462,19 @@ install_dependencies() {
         pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
     fi
 
-    # 安装macOS专用依赖包
-    echo -e " ${BLUE}安装 macOS 专用依赖包...${NC}"
-    for package in "${MACOS_PACKAGES[@]}"; do
-        echo -e " ${BLUE}安装: $package${NC}"
+    # 安装兼容的依赖包
+    echo -e " ${BLUE}安装兼容的依赖包...${NC}"
+    local installed_count=0
+    local total_count=${#COMPATIBLE_PACKAGES[@]}
+    
+    for package in "${COMPATIBLE_PACKAGES[@]}"; do
+        ((installed_count++))
+        echo -e " ${BLUE}[$installed_count/$total_count] 安装: $package${NC}"
         if ! pip install "$package" --timeout 300; then
             echo -e " ${YELLOW}尝试备用镜像...${NC}"
-            pip install "$package" -i $PYPI_MIRROR_BAK --timeout 300
+            if ! pip install "$package" -i $PYPI_MIRROR_BAK --timeout 300; then
+                echo -e " ${YELLOW}跳过: $package${NC}"
+            fi
         fi
     done
 
@@ -512,7 +519,7 @@ monitor_macos_startup() {
     echo -e "${CYAN}🚀 启动监控中...${NC}"
     echo -e "${BLUE}────────────────────────────────────────────${NC}"
     echo -e "${YELLOW}💡 提示: CUDA警告在macOS上是正常现象${NC}"
-    echo -e "${YELLOW}💡 提示: 初次下载运行需要下载模型文件，请等待..${NC}"
+    echo -e "${YELLOW}💡 提示: 首次运行模型需要下载，请等待...${NC}"
     echo ""
     
     # 设置超时（2小时）
@@ -596,7 +603,13 @@ start_webui() {
         echo -e " ${YELLOW}⚠️ 虚拟环境不存在，自动安装依赖${NC}"
         install_dependencies
     else
-        check_dependencies
+        # 检查依赖是否正常
+        if ! check_dependencies; then
+            echo -e " ${YELLOW}⚠️ 依赖检查失败，重新安装依赖${NC}"
+            install_dependencies
+        else
+            echo -e " ${GREEN}✅ 依赖检查通过${NC}"
+        fi
     fi
 
     # 检查模型文件
@@ -900,10 +913,30 @@ main_menu() {
 
     case $choice in
         1)
+            echo -e "${BLUE}🚀 开始完整安装流程...${NC}"
+            echo -e "${BLUE}────────────────────────────────────────────${NC}"
+            
+            # 步骤1: 下载WebUI
             if [ ! -d "stable-diffusion-webui" ]; then
+                echo -e "${YELLOW}步骤1: 下载 WebUI${NC}"
                 download_webui
+                if [ $? -ne 0 ]; then
+                    echo -e "${RED}❌ WebUI下载失败${NC}"
+                    return 1
+                fi
+            else
+                echo -e "${GREEN}✅ WebUI 已存在，跳过下载${NC}"
             fi
+            
+            # 步骤2: 安装依赖
+            echo -e "${YELLOW}步骤2: 安装依赖${NC}"
             install_dependencies
+            if [ $? -ne 0 ]; then
+                echo -e "${YELLOW}⚠️ 依赖安装遇到问题，但继续启动流程${NC}"
+            fi
+            
+            # 步骤3: 启动WebUI
+            echo -e "${YELLOW}步骤3: 启动 WebUI${NC}"
             start_webui
             ;;
         2)
