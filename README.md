@@ -125,7 +125,6 @@ chmod +x CUC_AI_Studio.command
 ```bash
 # 选择菜单选项 5 或 6 进行自动修复
 # 或手动安装缺失包:
-cd /Users/harry/Downloads/STABLE
 source venv/bin/activate
 pip install [缺失包名] -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
@@ -161,7 +160,6 @@ python webui.py --medvram --lowvram
 
 ### 手动启动命令
 ```bash
-cd /Users/harry/Downloads/STABLE
 source venv/bin/activate
 cd stable-diffusion-webui
 
@@ -174,7 +172,7 @@ python webui.py --listen --port 7860 --medvram --no-half
 
 ### 查看实时日志
 ```bash
-tail -f /Users/harry/Downloads/STABLE/sd_output.log
+tail -f sd_output.log
 ```
 
 ### 停止服务
@@ -212,7 +210,7 @@ kill -9 [进程ID]
 ## 📁 项目结构
 
 ```
-STABLE/
+stable-diffusion-cuc-main/
 ├── CUC_AI_Studio.sh          # 主安装脚本
 ├── venv/                     # Python 虚拟环境
 ├── stable-diffusion-webui/   # WebUI 主程序
@@ -229,7 +227,7 @@ STABLE/
 
 1. 查看完整日志
    ```bash
-   cat /Users/harry/Downloads/STABLE/sd_output.log
+   cat sd_output.log
    ```
 
 2. 运行系统诊断
