@@ -277,7 +277,7 @@ echo -e "${BLUE}─────────────────────�
 CHIP_TYPE=$(system_profiler SPHardwareDataType 2>/dev/null | grep "Chip" | awk -F: '{print $2}' | xargs)
 MACOS_VERSION=$(sw_vers -productVersion)
 
-if [[ $CHIP_TYPE == *"M1"* ]] || [[ $CHIP_TYPE == *"M2"* ]] || [[ $CHIP_TYPE == *"M3"* ]]; then
+if [[ $CHIP_TYPE == *"M1"* ]] || [[ $CHIP_TYPE == *"M2"* ]] || [[ $CHIP_TYPE == *"M3"* ]] || [[ $CHIP_TYPE == *"M4"* ]]; then
     echo -e " ${GREEN}🍎 Apple $CHIP_TYPE${NC}"
     echo -e " ${GREEN}📱 macOS $MACOS_VERSION${NC}"
     # Apple Silicon 特殊配置
