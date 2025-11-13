@@ -454,7 +454,7 @@ install_dependencies() {
 
     # 安装macOS优化的PyTorch
     echo -e " ${BLUE}安装 PyTorch (macOS 优化)...${NC}"
-    if [[ $CHIP_TYPE == *"M1"* ]] || [[ $CHIP_TYPE == *"M2"* ]] || [[ $CHIP_TYPE == *"M3"* ]]; then
+    if [[ $CHIP_TYPE == *"M1"* ]] || [[ $CHIP_TYPE == *"M2"* ]] || [[ $CHIP_TYPE == *"M3"* ]] || [[ $CHIP_TYPE == *"M4"* ]]; then
         # Apple Silicon
         pip install torch torchvision torchaudio -i $PYPI_MIRROR
     else
