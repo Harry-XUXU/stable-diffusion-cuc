@@ -13,6 +13,11 @@ NC='\033[0m'
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# 虚拟环境路径
+VENV_DIR="$SCRIPT_DIR/stable-diffusion-webui/venv"
+VENV_PYTHON="$VENV_DIR/bin/python3"
+VENV_PIP="$VENV_DIR/bin/pip"
+
 # 进程管理文件
 PID_FILE=".sd_webui.pid"
 PORT_FILE=".sd_webui.port"
@@ -171,7 +176,7 @@ COMPATIBLE_PACKAGES=(
 "tomli==2.3.0"
 "tomlkit==0.13.3"
 "torch==2.0.1"
-"torchaudio==2.9.0"
+"torchaudio"
 "torchdiffeq==0.2.3"
 "torchmetrics==1.8.2"
 "torchsde==0.2.6"
@@ -357,23 +362,43 @@ else
     echo -e " ${RED}❌ stable-diffusion-webui 目录不存在${NC}"
 fi
 
-if [ -d "stable-diffusion-webui/venv" ]; then
+if [ -d "$VENV_DIR" ]; then
     echo -e " ${GREEN}✅ venv 虚拟环境目录存在${NC}"
 else
     echo -e " ${YELLOW}⚠️ venv 目录不存在，将自动创建${NC}"
 fi
+
+# 检查虚拟环境工具是否存在
+check_venv_tools() {
+    if [ -f "$VENV_PYTHON" ]; then
+        echo -e " ${GREEN}✅ 虚拟环境 Python: $($VENV_PYTHON --version 2>/dev/null)${NC}"
+    else
+        echo -e " ${RED}❌ 虚拟环境 Python 不存在${NC}"
+        return 1
+    fi
+    
+    if [ -f "$VENV_PIP" ]; then
+        echo -e " ${GREEN}✅ 虚拟环境 Pip: $($VENV_PIP --version 2>/dev/null)${NC}"
+    else
+        echo -e " ${RED}❌ 虚拟环境 Pip 不存在${NC}"
+        return 1
+    fi
+    return 0
+}
 
 # macOS优化的依赖检查
 check_dependencies() {
     echo ""
     echo -e "${YELLOW}🔍 依赖健康检查...${NC}"
     
-    if [ ! -d "stable-diffusion-webui/venv" ]; then
+    if [ ! -d "$VENV_DIR" ]; then
         echo -e " ${RED}❌ 虚拟环境不存在${NC}"
         return 1
     fi
 
-    source stable-diffusion-webui/venv/bin/activate
+    if ! check_venv_tools; then
+        return 1
+    fi
     
     local critical_imports=(
         "torch::torch"
@@ -388,8 +413,8 @@ check_dependencies() {
     
     for import_pair in "${critical_imports[@]}"; do
         IFS='::' read -r package import_name <<< "$import_pair"
-        if python3 -c "import $import_name" 2>/dev/null; then
-            local version=$(pip show $package 2>/dev/null | grep Version | awk '{print $2}' || echo "未知")
+        if "$VENV_PYTHON" -c "import $import_name" 2>/dev/null; then
+            local version=$("$VENV_PIP" show $package 2>/dev/null | grep Version | awk '{print $2}' || echo "未知")
             echo -e " ${GREEN}✅ $package $version${NC}"
             ((working_count++))
         else
@@ -399,7 +424,7 @@ check_dependencies() {
     done
 
     # 检查MPS支持
-    if python3 -c "import torch; print('MPS available:', torch.backends.mps.is_available())" 2>/dev/null | grep -q "MPS available: True"; then
+    if "$VENV_PYTHON" -c "import torch; print('MPS available:', torch.backends.mps.is_available())" 2>/dev/null | grep -q "MPS available: True"; then
         echo -e " ${GREEN}✅ MPS 加速可用${NC}"
     else
         echo -e " ${YELLOW}⚠️ MPS 不可用，将使用CPU${NC}"
@@ -433,33 +458,41 @@ install_dependencies() {
     fi
 
     # 创建虚拟环境
-    if [ ! -d "stable-diffusion-webui/venv" ]; then
+    if [ ! -d "$VENV_DIR" ]; then
         echo -e " ${BLUE}创建虚拟环境...${NC}"
         cd stable-diffusion-webui
         python3 -m venv venv
         cd ..
+        
+        if [ ! -d "$VENV_DIR" ]; then
+            echo -e " ${RED}❌ 虚拟环境创建失败${NC}"
+            return 1
+        fi
     fi
 
-    # 激活环境
-    source stable-diffusion-webui/venv/bin/activate
+    # 检查虚拟环境工具
+    if ! check_venv_tools; then
+        echo -e " ${RED}❌ 虚拟环境工具不完整${NC}"
+        return 1
+    fi
 
     # 配置pip
     echo -e " ${BLUE}配置 pip 环境...${NC}"
-    python3 -m pip install --upgrade pip setuptools wheel -i $PYPI_MIRROR
+    "$VENV_PIP" install --upgrade pip setuptools wheel -i $PYPI_MIRROR
     
     # 设置pip配置
-    pip config set global.index-url $PYPI_MIRROR
-    pip config set global.timeout 300
-    pip config set global.retries 3
+    "$VENV_PIP" config set global.index-url $PYPI_MIRROR
+    "$VENV_PIP" config set global.timeout 300
+    "$VENV_PIP" config set global.retries 3
 
     # 安装macOS优化的PyTorch
     echo -e " ${BLUE}安装 PyTorch (macOS 优化)...${NC}"
     if [[ $CHIP_TYPE == *"M1"* ]] || [[ $CHIP_TYPE == *"M2"* ]] || [[ $CHIP_TYPE == *"M3"* ]] || [[ $CHIP_TYPE == *"M4"* ]]; then
         # Apple Silicon
-        pip install torch torchvision torchaudio -i $PYPI_MIRROR
+        "$VENV_PIP" install torch torchvision torchaudio -i $PYPI_MIRROR
     else
         # Intel Mac
-        pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+        "$VENV_PIP" install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
     fi
 
     # 安装兼容的依赖包
@@ -470,9 +503,9 @@ install_dependencies() {
     for package in "${COMPATIBLE_PACKAGES[@]}"; do
         ((installed_count++))
         echo -e " ${BLUE}[$installed_count/$total_count] 安装: $package${NC}"
-        if ! pip install "$package" --timeout 300; then
+        if ! "$VENV_PIP" install "$package" --timeout 300; then
             echo -e " ${YELLOW}尝试备用镜像...${NC}"
-            if ! pip install "$package" -i $PYPI_MIRROR_BAK --timeout 300; then
+            if ! "$VENV_PIP" install "$package" -i $PYPI_MIRROR_BAK --timeout 300; then
                 echo -e " ${YELLOW}跳过: $package${NC}"
             fi
         fi
@@ -599,7 +632,7 @@ start_webui() {
     echo -e "${BLUE}────────────────────────────────────────────${NC}"
     
     # 检查环境
-    if [ ! -d "stable-diffusion-webui/venv" ]; then
+    if [ ! -d "$VENV_DIR" ]; then
         echo -e " ${YELLOW}⚠️ 虚拟环境不存在，自动安装依赖${NC}"
         install_dependencies
     else
@@ -635,8 +668,12 @@ start_webui() {
         return 1
     fi
 
-    # 激活环境
-    source venv/bin/activate
+    # 检查虚拟环境工具
+    if ! check_venv_tools; then
+        echo -e " ${RED}❌ 虚拟环境工具不完整${NC}"
+        cd ..
+        return 1
+    fi
 
     # 设置macOS优化的环境变量
     export PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0
@@ -673,9 +710,9 @@ start_webui() {
 
         echo -e " ${BLUE}尝试端口: $port${NC}"
         
-        # 启动服务（使用macOS优化参数）
+        # 启动服务（使用macOS优化参数）- 使用虚拟环境的Python
         echo -e " ${BLUE}启动服务...${NC}"
-        python3 webui.py --listen --port $port --skip-torch-cuda-test --no-half > ../sd_output.log 2>&1 &
+        "$VENV_PYTHON" webui.py --listen --port $port --skip-torch-cuda-test --no-half > ../sd_output.log 2>&1 &
         PID=$!
 
         # 等待进程启动
@@ -827,8 +864,9 @@ diagnose_system() {
     
     if [ -d "stable-diffusion-webui" ]; then
         echo -e "WebUI目录: ${GREEN}存在${NC}"
-        if [ -d "stable-diffusion-webui/venv" ]; then
+        if [ -d "$VENV_DIR" ]; then
             echo -e "虚拟环境: ${GREEN}存在${NC}"
+            check_venv_tools
             check_dependencies
         else
             echo -e "虚拟环境: ${RED}缺失${NC}"
@@ -851,13 +889,17 @@ fix_common_issues() {
     echo ""
     echo -e "${YELLOW}🔧 修复常见问题${NC}"
     
-    # 清理缓存
-    echo -e " ${BLUE}清理 pip 缓存...${NC}"
-    pip cache purge 2>/dev/null || true
-    
-    # 重新安装关键包
-    echo -e " ${BLUE}重新安装关键依赖...${NC}"
-    pip install --force-reinstall "torch" "torchvision" "torchaudio"
+    # 检查虚拟环境工具
+    if [ -d "$VENV_DIR" ]; then
+        echo -e " ${BLUE}清理 pip 缓存...${NC}"
+        "$VENV_PIP" cache purge 2>/dev/null || true
+        
+        # 重新安装关键包
+        echo -e " ${BLUE}重新安装关键依赖...${NC}"
+        "$VENV_PIP" install --force-reinstall "torch" "torchvision" "torchaudio"
+    else
+        echo -e " ${YELLOW}⚠️ 虚拟环境不存在，跳过修复${NC}"
+    fi
     
     # 修复权限问题
     echo -e " ${BLUE}修复文件权限...${NC}"
